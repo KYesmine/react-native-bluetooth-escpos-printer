@@ -315,7 +315,7 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
         deviceWidth = width;
     }
 
-    @ReactMethod
+@ReactMethod
     public void printPic(String base64encodeStr, @Nullable  ReadableMap options) {
         int width = 0;
         int leftPadding = 0;
@@ -345,6 +345,9 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
             sendDataByte(Command.ESC_Init);
             sendDataByte(Command.LF);
             sendDataByte(data);
+            sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(1));
+            sendDataByte(PrinterCommand.POS_Set_Cut(1));
+            sendDataByte(PrinterCommand.POS_Set_PrtInit());
         }
     }
 
