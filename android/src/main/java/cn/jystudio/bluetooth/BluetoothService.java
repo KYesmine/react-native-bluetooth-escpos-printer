@@ -225,20 +225,19 @@ public class BluetoothService {
              //   }
            // }
 
-            // try with given uuid
-            if (mmSocket == null) {
-                try {
-                    tmp = mmDevice.createRfcommSocketToServiceRecord(MY_UUID);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    Log.e(TAG, "create() failed", e);
-                }
-                if (tmp == null) {
-                    Log.e(TAG, "create() failed: Socket NULL.");
-                    connectionFailed();
-                    return;
-                }
+
+            try {
+                tmp = mmDevice.createRfcommSocketToServiceRecord(MY_UUID);
+            } catch (IOException e) {
+                e.printStackTrace();
+                Log.e(TAG, "create() failed", e);
             }
+            if (tmp == null) {
+                Log.e(TAG, "create() failed: Socket NULL.");
+                connectionFailed();
+                return;
+            }
+
             mmSocket = tmp;
 
             // Make a connection to the BluetoothSocket
