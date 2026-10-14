@@ -441,6 +441,9 @@ let options = {
 #### printQRCode(String content, int size, int correctionLevel) ####
   prints the qrcode.
 
+#### printQRCodeWithLines(String content, int qrSize, int correctionLevel, Array lines, Object options) ####
+  prints the text lines stacked in a left column with the qrcode on the right, as one full-width image (Android only). Long lines wrap inside the column. options: `fontSize` (px, default 18), `bold` (default false).
+
 #### printBarCode(String str,int nType, int nWidthX, int nHeight, int nHriFontType, int nHriFontPosition) ####
   prints the barcode.
 

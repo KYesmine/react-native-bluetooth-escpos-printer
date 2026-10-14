@@ -3,6 +3,13 @@ package cn.jystudio.bluetooth.escpos;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Typeface;
+import android.text.Layout;
+import android.text.StaticLayout;
+import android.text.TextPaint;
 import android.util.Base64;
 import android.util.Log;
 import cn.jystudio.bluetooth.BluetoothService;
@@ -13,6 +20,7 @@ import cn.jystudio.bluetooth.escpos.command.sdk.PrinterCommand;
 import com.facebook.react.bridge.*;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
+import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
@@ -381,36 +389,7 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
     @ReactMethod
     public void printQRCode(String content, int size, int correctionLevel, final Promise promise) {
         try {
-            Log.i(TAG, "生成的文本：" + content);
-            // 把输入的文本转为二维码
-            Hashtable<EncodeHintType, Object> hints = new Hashtable<EncodeHintType, Object>();
-            hints.put(EncodeHintType.CHARACTER_SET, "utf-8");
-            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.forBits(correctionLevel));
-            hints.put(EncodeHintType.MARGIN, 2);
-            BitMatrix bitMatrix = new QRCodeWriter().encode(content,
-                    BarcodeFormat.QR_CODE, size, size, hints);
-
-            int width = bitMatrix.getWidth();
-            int height = bitMatrix.getHeight();
-
-            System.out.println("w:" + width + "h:"
-                    + height);
-
-            int[] pixels = new int[width * height];
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
-                    if (bitMatrix.get(x, y)) {
-                        pixels[y * width + x] = 0xff000000;
-                    } else {
-                        pixels[y * width + x] = 0xffffffff;
-                    }
-                }
-            }
-
-            Bitmap bitmap = Bitmap.createBitmap(width, height,
-                    Bitmap.Config.ARGB_8888);
-
-            bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
+            Bitmap bitmap = createQRCodeBitmap(content, size, correctionLevel);
 
             //TODO: may need a left padding to align center.
             byte[] data = PrintPicture.POS_PrintBMP(bitmap, size, 0, 0);
@@ -422,6 +401,90 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
         } catch (Exception e) {
             promise.reject(e.getMessage(), e);
         }
+    }
+
+    /**
+     * Prints the text lines in a left column beside a QR code on the right, as
+     * one full-width image. Long lines wrap inside the column.
+     */
+    @ReactMethod
+    public void printQRCodeWithLines(String content, int qrSize, int correctionLevel, ReadableArray lines,
+                                     @Nullable ReadableMap options, final Promise promise) {
+        try {
+            int fontSize = options != null && options.hasKey("fontSize") ? options.getInt("fontSize") : 18;
+            boolean bold = options != null && options.hasKey("bold") && options.getBoolean("bold");
+
+            TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(Color.BLACK);
+            paint.setTextSize(fontSize);
+            paint.setTypeface(bold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+
+            int textWidth = deviceWidth - qrSize - 8;
+            List<StaticLayout> layouts = new ArrayList<StaticLayout>();
+            int textHeight = 0;
+            for (int i = 0; i < lines.size(); i++) {
+                // The constructor form, because StaticLayout.Builder needs API 23.
+                StaticLayout layout = new StaticLayout(lines.getString(i), paint, textWidth,
+                        Layout.Alignment.ALIGN_NORMAL, 1f, 0f, false);
+                layouts.add(layout);
+                textHeight += layout.getHeight();
+            }
+
+            int height = Math.max(qrSize, textHeight);
+            Bitmap bitmap = Bitmap.createBitmap(deviceWidth, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            canvas.drawColor(Color.WHITE);
+            canvas.drawBitmap(createQRCodeBitmap(content, qrSize, correctionLevel),
+                    deviceWidth - qrSize, (height - qrSize) / 2f, null);
+            canvas.translate(0, (height - textHeight) / 2f);
+            for (StaticLayout layout : layouts) {
+                layout.draw(canvas);
+                canvas.translate(0, layout.getHeight());
+            }
+
+            byte[] data = PrintPicture.POS_PrintBMP(bitmap, deviceWidth, 0, 0);
+            if (sendDataByte(data)) {
+                promise.resolve(null);
+            } else {
+                promise.reject("COMMAND_NOT_SEND");
+            }
+        } catch (Exception e) {
+            promise.reject(e.getMessage(), e);
+        }
+    }
+
+    private Bitmap createQRCodeBitmap(String content, int size, int correctionLevel) throws WriterException {
+        Log.i(TAG, "生成的文本：" + content);
+        // 把输入的文本转为二维码
+        Hashtable<EncodeHintType, Object> hints = new Hashtable<EncodeHintType, Object>();
+        hints.put(EncodeHintType.CHARACTER_SET, "utf-8");
+        hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.forBits(correctionLevel));
+        hints.put(EncodeHintType.MARGIN, 2);
+        BitMatrix bitMatrix = new QRCodeWriter().encode(content,
+                BarcodeFormat.QR_CODE, size, size, hints);
+
+        int width = bitMatrix.getWidth();
+        int height = bitMatrix.getHeight();
+
+        System.out.println("w:" + width + "h:"
+                + height);
+
+        int[] pixels = new int[width * height];
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                if (bitMatrix.get(x, y)) {
+                    pixels[y * width + x] = 0xff000000;
+                } else {
+                    pixels[y * width + x] = 0xffffffff;
+                }
+            }
+        }
+
+        Bitmap bitmap = Bitmap.createBitmap(width, height,
+                Bitmap.Config.ARGB_8888);
+
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
+        return bitmap;
     }
 
     @ReactMethod
