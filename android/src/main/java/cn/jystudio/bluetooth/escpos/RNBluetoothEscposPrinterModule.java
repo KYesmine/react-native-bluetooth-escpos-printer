@@ -386,6 +386,7 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
             Hashtable<EncodeHintType, Object> hints = new Hashtable<EncodeHintType, Object>();
             hints.put(EncodeHintType.CHARACTER_SET, "utf-8");
             hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.forBits(correctionLevel));
+            hints.put(EncodeHintType.MARGIN, 2);
             BitMatrix bitMatrix = new QRCodeWriter().encode(content,
                     BarcodeFormat.QR_CODE, size, size, hints);
 
